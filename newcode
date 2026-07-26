@@ -1,0 +1,385 @@
+extends Node2D
+
+# Files
+@onready var readme: TextureButton = %readme
+@onready var file_explorer: TextureButton = %"File explorer"
+@onready var top_secret: TextureButton = %"TOP SECRET"
+@onready var gmail: TextureButton = %Gmail
+
+# Riddle 1 variables
+@onready var Riddle1: TextureRect = %Riddle1
+@onready var riddle_1_close: TextureButton = %riddle_1_close
+@onready var password_input: LineEdit = %password_input
+@onready var label: Label = %label
+
+# Access
+@onready var access_granted: CanvasItem = %"access granted"
+@onready var access_denied: CanvasItem = %"access denied"
+@onready var close_x: Button = %close_x
+@onready var close_ok: Button = %close_ok
+
+
+# Community variables / passwords
+var password1: String = "chooseme"
+var password2: String = "pickme"
+var password3: String = "loveme"
+var riddle1done: bool = false
+var riddle2done: bool = false
+var riddle3done: bool = false
+
+# Password prompts
+@onready var pass_prompt_m: TextureRect = %pass_prompt_m
+@onready var pass_prompt_ts: TextureRect = %pass_prompt_ts
+@onready var ipassword: LineEdit = %ipassword
+@onready var close_xx: Button = %close_xx
+
+# Ending sequence
+@onready var ending_layer: CanvasLayer = %EndingLayer
+@onready var fatal_error: TextureRect = %FatalError
+@onready var bsod: TextureRect = %BSOD
+
+const CAT_TEXTURE := preload("res://cat.png")  # swap for your actual cat image
+const CAT_SPAWN_INTERVAL := 0.15     # seconds between spawns, at the start
+const CAT_SPAWN_ACCELERATION := 0.92 # interval shrinks by this factor each spawn
+const CAT_SPAM_DURATION := 5.0       # seconds of cat chaos before the blue screen
+const CAT_WINDOW_SIZE := Vector2(160, 120)
+const FATAL_ERROR_DURATION := 2.0    # how long the error popup stays up first
+
+var _cat_timer: Timer = null
+
+# --- File Explorer window contents ---
+# NOTE: %FileExplorerWindow needs to be set on whatever your actual
+# File Explorer window/container node is called.
+@onready var file_explorer_window: CanvasItem = %FileExplorerWindow
+@onready var cheese: CanvasItem = %cheese
+@onready var diary: CanvasItem = %diary
+@onready var numbers: CanvasItem = %numbers
+@onready var my_fav_cheese: Button = %my_fav_cheese
+@onready var uncs_diary: Button = %uncs_diary
+@onready var i_3_numbers: Button = %i_3_numbers
+@onready var x_step_3: Button = %x_step_3
+@onready var full_screen_button: Button = %full_screen
+@onready var x_diary: Button = %x_diary
+@onready var x_cheese: Button = %x_cheese
+@onready var x_numbers: Button = %x_numbers
+
+# --- Mail (Gmail) send functionality ---
+@onready var mail_graphic: CanvasItem = %mail_graphic
+@onready var mail_sent: CanvasItem = %sent
+@onready var mail_hint: CanvasItem = %hint
+@onready var mail_subject: LineEdit = %subject
+@onready var mail_user_email: LineEdit = %user_email
+@onready var mail_send: Button = %send
+@onready var x_mail: Button = %x_mail
+
+var mail_visible: bool = false  # starts hidden -- opens once riddle 2 is solved
+const EMAILJS_URL: String = "https://api.emailjs.com/api/v1.0/email/send"
+const SERVICE_ID: String = "gmail2"
+const TEMPLATE_ID: String = "template_tr85ng6"
+const PUBLIC_KEY: String = "ltHoWSgXrKnyLqlsh"
+const PRIVATE_KEY: String = "w9wa7RmqfmbXSB4moRKdJ"
+
+var http_request: HTTPRequest = HTTPRequest.new()
+
+
+func _ready() -> void:
+	Riddle1.visible = false
+	password_input.editable = false
+	password_input.visible = false
+	access_granted.visible = false
+	access_denied.visible = false
+
+	close_x.disabled = true
+	close_ok.disabled = true
+
+	pass_prompt_m.visible = false
+	pass_prompt_ts.visible = false
+	ipassword.visible = false
+	ipassword.editable = false
+	close_xx.disabled = true
+
+	fatal_error.visible = false
+	bsod.visible = false
+
+	# File Explorer window starts closed, with all its sub-items closed too
+	file_explorer_window.hide()
+	cheese.hide()
+	diary.hide()
+	numbers.hide()
+
+	# Mail app: hidden until riddle 2 is solved
+	if mail_visible == false:
+		mail_graphic.hide()
+	else:
+		mail_graphic.show()
+	mail_sent.hide()
+	mail_hint.hide()
+
+	# EmailJS request node
+	add_child(http_request)
+	http_request.request_completed.connect(func(res, code, hdrs, body): print("SERVER REPLY: ", code, " | ", body.get_string_from_utf8()))
+
+	if not password_input.text_submitted.is_connected(_on_password_input_text_entered):
+		password_input.text_submitted.connect(_on_password_input_text_entered)
+	if not readme.pressed.is_connected(_on_readme_pressed):
+		readme.pressed.connect(_on_readme_pressed)
+
+	if not file_explorer.pressed.is_connected(_on_file_explorer_pressed):
+		file_explorer.pressed.connect(_on_file_explorer_pressed)
+	if not top_secret.pressed.is_connected(_on_top_secret_pressed):
+		top_secret.pressed.connect(_on_top_secret_pressed)
+	if not gmail.pressed.is_connected(_on_gmail_pressed):
+		gmail.pressed.connect(_on_gmail_pressed)
+
+	if not close_x.pressed.is_connected(_on_close_x_pressed):
+		close_x.pressed.connect(_on_close_x_pressed)
+	if not close_ok.pressed.is_connected(_on_close_ok_pressed):
+		close_ok.pressed.connect(_on_close_ok_pressed)
+
+	if not ipassword.text_submitted.is_connected(_on_ipassword_text_submitted):
+		ipassword.text_submitted.connect(_on_ipassword_text_submitted)
+	if not close_xx.pressed.is_connected(_on_close_xx_pressed):
+		close_xx.pressed.connect(_on_close_xx_pressed)
+
+	if riddle_1_close and not riddle_1_close.pressed.is_connected(_on_riddle_1_close_pressed):
+		riddle_1_close.pressed.connect(_on_riddle_1_close_pressed)
+
+	# File Explorer window buttons
+	if not my_fav_cheese.pressed.is_connected(_on_my_fav_cheese_pressed):
+		my_fav_cheese.pressed.connect(_on_my_fav_cheese_pressed)
+	if not uncs_diary.pressed.is_connected(_on_uncs_diary_pressed):
+		uncs_diary.pressed.connect(_on_uncs_diary_pressed)
+	if not i_3_numbers.pressed.is_connected(_on_i_3_numbers_pressed):
+		i_3_numbers.pressed.connect(_on_i_3_numbers_pressed)
+	if not x_step_3.pressed.is_connected(_on_x_step_3_pressed):
+		x_step_3.pressed.connect(_on_x_step_3_pressed)
+	if not full_screen_button.pressed.is_connected(_on_full_screen_pressed):
+		full_screen_button.pressed.connect(_on_full_screen_pressed)
+	if not x_diary.pressed.is_connected(_on_x_diary_pressed):
+		x_diary.pressed.connect(_on_x_diary_pressed)
+	if not x_cheese.pressed.is_connected(_on_x_cheese_pressed):
+		x_cheese.pressed.connect(_on_x_cheese_pressed)
+	if not x_numbers.pressed.is_connected(_on_x_numbers_pressed):
+		x_numbers.pressed.connect(_on_x_numbers_pressed)
+
+	# Mail buttons
+	if not mail_send.pressed.is_connected(_on_send_pressed):
+		mail_send.pressed.connect(_on_send_pressed)
+	if not x_mail.pressed.is_connected(_on_x_mail_pressed):
+		x_mail.pressed.connect(_on_x_mail_pressed)
+
+
+# RIDDLE 1
+func _on_readme_pressed() -> void:
+	Riddle1.visible = true
+	password_input.editable = true
+	password_input.visible = true
+	password_input.grab_focus()
+
+
+func _on_riddle_1_close_pressed() -> void:
+	Riddle1.visible = false
+	password_input.editable = false
+
+	password_input.text = ""
+	password_input.release_focus()
+
+	access_granted.visible = false
+	access_denied.visible = false
+
+
+func _on_password_input_text_entered(new_text: String) -> void:
+	close_x.disabled = false
+	close_ok.disabled = false
+	if new_text.strip_edges().to_lower() == password1:
+		riddle1done = true
+		access_granted.visible = true
+		access_denied.visible = false
+	else:
+		access_denied.visible = true
+		access_granted.visible = false
+		password_input.text = ""
+		password_input.grab_focus()
+
+
+func _on_file_explorer_pressed() -> void:
+	if riddle1done:
+		file_explorer_window.show()
+
+
+func _on_close_x_pressed() -> void:
+	access_granted.visible = false
+	access_denied.visible = false
+	if riddle1done:
+		_on_riddle_1_close_pressed()
+
+
+func _on_close_ok_pressed() -> void:
+	access_granted.visible = false
+	access_denied.visible = false
+	if riddle1done:
+		_on_riddle_1_close_pressed()
+
+
+# RIDDLE 2 & 3
+func _on_ipassword_text_submitted(new_text: String) -> void:
+	close_x.disabled = false
+	close_ok.disabled = false
+	if riddle1done and !riddle2done and new_text.strip_edges().to_lower() == password2:
+		riddle2done = true
+		label.text = "Access granted"
+		_on_close_xx_pressed()
+		mail_visible = true
+		mail_graphic.show()
+	elif riddle1done and riddle2done and new_text.strip_edges().to_lower() == password3:
+		riddle3done = true
+		label.text = "Access granted again"
+		_start_ending_sequence()
+	else:
+		access_denied.visible = true
+
+
+func _on_gmail_pressed() -> void:
+	if riddle2done:
+		mail_graphic.show()
+		return
+	close_xx.disabled = false
+	pass_prompt_m.visible = true
+	ipassword.visible = true
+	ipassword.editable = true
+	ipassword.grab_focus()
+
+
+func _on_top_secret_pressed() -> void:
+	close_xx.disabled = false
+	pass_prompt_m.visible = true
+	ipassword.visible = true
+	ipassword.editable = true
+	ipassword.grab_focus()
+
+
+func _on_close_xx_pressed() -> void:
+	pass_prompt_m.visible = false
+	pass_prompt_ts.visible = false
+
+	ipassword.visible = false
+	ipassword.text = ""
+	ipassword.release_focus()
+
+
+# --- File Explorer window contents ---
+func _on_my_fav_cheese_pressed() -> void:
+	cheese.show()
+
+
+func _on_uncs_diary_pressed() -> void:
+	diary.show()
+	# if theres time make it dragable
+	# change it to the actual scene once you get the grapic
+
+
+func _on_i_3_numbers_pressed() -> void:
+	numbers.show()
+	# change it to the actual scene once you get the grapic
+
+
+func _on_x_step_3_pressed() -> void:
+	file_explorer_window.hide()
+
+
+func _on_full_screen_pressed() -> void:
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+
+func _on_x_diary_pressed() -> void:
+	diary.hide()
+
+
+func _on_x_cheese_pressed() -> void:
+	cheese.hide()
+
+
+func _on_x_numbers_pressed() -> void:
+	numbers.hide()
+
+
+# --- Mail (Gmail) send functionality ---
+func _on_send_pressed() -> void:
+	if mail_subject.text == "morse":
+		var player_email: String = mail_user_email.text
+
+		var headers: PackedStringArray = ["Content-Type: application/json"]
+		var body: Dictionary = {
+			"service_id": SERVICE_ID,
+			"template_id": TEMPLATE_ID,
+			"user_id": PUBLIC_KEY,
+			"accessToken": PRIVATE_KEY,
+			"template_params": {"to_email": player_email}
+		}
+		var json_body: String = JSON.stringify(body)
+		http_request.request(EMAILJS_URL, headers, HTTPClient.METHOD_POST, json_body)
+
+		mail_sent.show()
+		await get_tree().create_timer(1.0).timeout
+		mail_sent.hide()
+	else:
+		mail_hint.show()
+		await get_tree().create_timer(0.5).timeout
+		mail_hint.hide()
+
+
+func _on_x_mail_pressed() -> void:
+	mail_graphic.hide()
+	mail_visible = false
+
+
+# --- Ending sequence: fatal error, then cat spam, then a blue screen ---
+
+func _start_ending_sequence() -> void:
+	fatal_error.visible = true
+	await get_tree().create_timer(FATAL_ERROR_DURATION).timeout
+	fatal_error.visible = false
+	_start_cat_spam()
+
+
+func _start_cat_spam() -> void:
+	_cat_timer = Timer.new()
+	_cat_timer.wait_time = CAT_SPAWN_INTERVAL
+	_cat_timer.one_shot = false
+	add_child(_cat_timer)
+	_cat_timer.timeout.connect(_spawn_cat_window)
+	_cat_timer.start()
+
+	await get_tree().create_timer(CAT_SPAM_DURATION).timeout
+	_trigger_bsod()
+
+
+func _spawn_cat_window() -> void:
+	var cat := TextureRect.new()
+	cat.texture = CAT_TEXTURE
+	cat.custom_minimum_size = CAT_WINDOW_SIZE
+	cat.size = CAT_WINDOW_SIZE
+
+	var viewport_size := get_viewport_rect().size
+	var max_x: float = maxf(viewport_size.x - CAT_WINDOW_SIZE.x, 0.0)
+	var max_y: float = maxf(viewport_size.y - CAT_WINDOW_SIZE.y, 0.0)
+	cat.position = Vector2(randf() * max_x, randf() * max_y)
+
+	ending_layer.add_child(cat)
+
+	# Ramp up the chaos -- each new cat spawns a little faster than the last.
+	_cat_timer.wait_time = max(_cat_timer.wait_time * CAT_SPAWN_ACCELERATION, 0.02)
+
+
+func _trigger_bsod() -> void:
+	_cat_timer.stop()
+	_cat_timer.queue_free()
+
+	for child in ending_layer.get_children():
+		if child != bsod and child != fatal_error:
+			child.queue_free()
+
+	bsod.visible = true
