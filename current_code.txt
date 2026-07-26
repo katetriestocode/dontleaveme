@@ -45,6 +45,18 @@ var riddle3done: bool = false
 @onready var x_cheese: Button = %x_cheese
 @onready var x_numbers: Button = %x_numbers
 
+# Ending sequence
+@onready var ending_layer: CanvasLayer = %EndingLayer
+@onready var fatal_error: TextureRect = %FatalError
+@onready var bsod: TextureRect = %BSOD
+const CAT_TEXTURE := preload("res://assets2/cat.png")  # swap for your actual cat image
+const CAT_SPAWN_INTERVAL := 0.15     # seconds between spawns, at the start
+const CAT_SPAWN_ACCELERATION := 0.92 # interval shrinks by this factor each spawn
+const CAT_SPAM_DURATION := 5.0       # seconds of cat chaos before the blue screen
+const CAT_WINDOW_SIZE := Vector2(160, 120)
+const FATAL_ERROR_DURATION := 2.0    # how long the error popup stays up first
+var _cat_timer: Timer = null
+
 
 func _ready() -> void:
 	Riddle1.visible = false
@@ -92,6 +104,9 @@ func _ready() -> void:
 		
 	if riddle_1_close:
 		riddle_1_close.pressed.connect(_on_riddle_1_close_pressed)
+
+	fatal_error.visible = false
+	bsod.visible = false
 		
 	
 # RIDDLE 1
@@ -179,6 +194,10 @@ func _on_top_secret_pressed() -> void:
 	ipassword.grab_focus()
 
 
+	help here -> _start_ending_sequence()
+	
+
+
 func _on_close_xx_pressed() -> void:
 	pass_prompt_m.visible = false
 	pass_prompt_ts.visible = false
@@ -187,3 +206,54 @@ func _on_close_xx_pressed() -> void:
 	ipassword.text = ""
 	ipassword.release_focus()
 	
+
+
+
+
+# --- Ending sequence: fatal error, then cat spam, then a blue screen ---
+
+func _start_ending_sequence() -> void:
+	fatal_error.visible = true
+	await get_tree().create_timer(FATAL_ERROR_DURATION).timeout
+	fatal_error.visible = false
+	_start_cat_spam()
+
+
+func _start_cat_spam() -> void:
+	_cat_timer = Timer.new()
+	_cat_timer.wait_time = CAT_SPAWN_INTERVAL
+	_cat_timer.one_shot = false
+	add_child(_cat_timer)
+	_cat_timer.timeout.connect(_spawn_cat_window)
+	_cat_timer.start()
+
+	await get_tree().create_timer(CAT_SPAM_DURATION).timeout
+	_trigger_bsod()
+
+
+func _spawn_cat_window() -> void:
+	var cat := TextureRect.new()
+	cat.texture = CAT_TEXTURE
+	cat.custom_minimum_size = CAT_WINDOW_SIZE
+	cat.size = CAT_WINDOW_SIZE
+
+	var viewport_size := get_viewport_rect().size
+	var max_x: float = maxf(viewport_size.x - CAT_WINDOW_SIZE.x, 0.0)
+	var max_y: float = maxf(viewport_size.y - CAT_WINDOW_SIZE.y, 0.0)
+	cat.position = Vector2(randf() * max_x, randf() * max_y)
+
+	ending_layer.add_child(cat)
+
+	# Ramp up the chaos -- each new cat spawns a little faster than the last.
+	_cat_timer.wait_time = max(_cat_timer.wait_time * CAT_SPAWN_ACCELERATION, 0.02)
+
+
+func _trigger_bsod() -> void:
+	_cat_timer.stop()
+	_cat_timer.queue_free()
+
+	for child in ending_layer.get_children():
+		if child != bsod and child != fatal_error:
+			child.queue_free()
+
+	bsod.visible = true
