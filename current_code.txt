@@ -192,9 +192,8 @@ func _on_top_secret_pressed() -> void:
 	ipassword.visible = true
 	ipassword.editable = true
 	ipassword.grab_focus()
-
-
-	help here -> _start_ending_sequence()
+	if riddle3done:
+		_start_ending_sequence()
 	
 
 
