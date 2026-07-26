@@ -1,0 +1,189 @@
+extends Node2D
+
+# Files
+@onready var readme: TextureButton = %readme
+@onready var file_explorer: TextureButton = %"File explorer"
+@onready var top_secret: TextureButton = %"TOP SECRET"
+@onready var gmail: TextureButton = %Gmail
+
+# Riddle 1 variables
+@onready var Riddle1: TextureRect = %Riddle1
+@onready var riddle_1_close: TextureButton = %riddle_1_close
+@onready var password_input: LineEdit = %password_input
+@onready var label: Label = %label
+
+# Access
+@onready var access_granted: CanvasItem = %"access granted"
+@onready var access_denied: CanvasItem = %"access denied"
+@onready var close_x: Button = %close_x
+@onready var close_ok: Button = %close_ok
+
+
+# Community variables / passwords
+var password1: String = "chooseme"
+var password2: String = "pickme"
+var password3: String = "loveme"
+var riddle1done: bool = false
+var riddle2done: bool = false
+var riddle3done: bool = false
+
+# Password prompts
+@onready var pass_prompt_m: TextureRect = %pass_prompt_m
+@onready var pass_prompt_ts: TextureRect = %pass_prompt_ts
+@onready var ipassword: LineEdit = %ipassword
+@onready var close_xx: Button = %close_xx
+
+# Riddle 2
+@onready var riddle2: TextureRect = %riddle2
+@onready var cheese: CanvasItem = %cheese
+@onready var diary: CanvasItem = %diary
+@onready var numbers: CanvasItem = %numbers
+@onready var my_fav_cheese: TextureButton = %my_fav_cheese
+@onready var uncs_diary: TextureButton = %uncs_diary
+@onready var i_3_numbers: TextureButton = %i_3_numbers
+@onready var x_diary: Button = %x_diary
+@onready var x_cheese: Button = %x_cheese
+@onready var x_numbers: Button = %x_numbers
+
+
+func _ready() -> void:
+	Riddle1.visible = false
+	password_input.editable = false
+	password_input.visible = false
+	access_granted.visible = false
+	access_denied.visible = false
+	
+	
+	close_x.disabled = true
+	close_ok.disabled = true
+	
+	pass_prompt_m.visible = false
+	pass_prompt_ts.visible = false
+	ipassword.visible = false
+	ipassword.editable = false
+	close_xx.disabled = true
+	
+	riddle2.visible = false
+	
+	cheese.hide()
+	diary.hide()
+	numbers.hide()
+
+	my_fav_cheese.pressed.connect(func(): cheese.show())
+	uncs_diary.pressed.connect(func(): diary.show())
+	i_3_numbers.pressed.connect(func(): numbers.show())
+	x_cheese.pressed.connect(func(): cheese.hide())
+	x_diary.pressed.connect(func(): diary.hide())
+	x_numbers.pressed.connect(func(): numbers.hide())
+
+	password_input.text_submitted.connect(_on_password_input_text_entered)
+	readme.pressed.connect(_on_readme_pressed)
+	
+	file_explorer.pressed.connect(_on_file_explorer_pressed)
+	top_secret.pressed.connect(_on_top_secret_pressed)
+	gmail.pressed.connect(_on_gmail_pressed)
+	
+
+	close_x.pressed.connect(_on_close_x_pressed)
+	close_ok.pressed.connect(_on_close_ok_pressed)
+	
+	ipassword.text_submitted.connect(_on_ipassword_text_submitted)
+	close_xx.pressed.connect(_on_close_xx_pressed)
+		
+	if riddle_1_close:
+		riddle_1_close.pressed.connect(_on_riddle_1_close_pressed)
+		
+	
+# RIDDLE 1
+func _on_readme_pressed() -> void:
+	Riddle1.visible = true
+	password_input.editable = true
+	password_input.visible = true
+	password_input.grab_focus()
+	
+
+
+func _on_riddle_1_close_pressed() -> void:
+	Riddle1.visible = false
+	password_input.editable = false
+
+	password_input.text = ""
+	password_input.release_focus()
+	
+	access_granted.visible = false
+	access_denied.visible = false
+	
+
+
+func _on_password_input_text_entered(new_text: String) -> void:
+	close_x.disabled = false
+	close_ok.disabled = false
+	if new_text.strip_edges().to_lower() == password1:
+		riddle1done = true
+		access_granted.visible = true
+		access_denied.visible = false
+	else:
+		access_denied.visible = true
+		access_granted.visible = false
+		password_input.text = ""
+		password_input.grab_focus()
+		
+		
+func _on_close_x_pressed() -> void:
+	access_granted.visible = false
+	access_denied.visible = false
+	if riddle1done:
+		_on_riddle_1_close_pressed()
+
+
+func _on_close_ok_pressed() -> void:
+	access_granted.visible = false
+	access_denied.visible = false
+	if riddle1done:
+		_on_riddle_1_close_pressed()
+
+# File explorer
+func _on_file_explorer_pressed() -> void:
+	if !riddle1done:
+		file_explorer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	else: 
+		riddle2.visible = true
+
+# RIDDLE 2 & 3
+func _on_ipassword_text_submitted(new_text: String) -> void:
+	close_x.disabled = false
+	close_ok.disabled = false
+	if riddle1done and !riddle2done and new_text.strip_edges().to_lower() == password2:
+		riddle2done = true
+		label.text = "Access granted"
+	elif riddle1done and  riddle2done and new_text.strip_edges().to_lower() == password3:
+		riddle3done = true
+		label.text = "Access granted again"
+	else: 
+		access_denied.visible = true
+		
+		
+
+func _on_gmail_pressed() -> void:
+	close_xx.disabled = false
+	pass_prompt_m.visible = true
+	ipassword.visible = true
+	ipassword.editable = true
+	ipassword.grab_focus()
+
+func _on_top_secret_pressed() -> void:
+	close_xx.disabled = false
+	pass_prompt_m.visible = true
+	ipassword.visible = true
+	ipassword.editable = true
+	ipassword.grab_focus()
+
+
+func _on_close_xx_pressed() -> void:
+	pass_prompt_m.visible = false
+	pass_prompt_ts.visible = false
+	
+	ipassword.visible = false
+	ipassword.text = ""
+	ipassword.release_focus()
+	
